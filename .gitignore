@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+Sho/
+venv/
+.env/
+
+# Environment variables
+.env
+.env.*
+
+# VSCode / IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Celery
+celerybeat-schedule
+
+# Logs
+*.log
+
+# Storage (optional if not needed in repo)
+app/storage/
