@@ -1,44 +1,41 @@
-from pathlib import Path
 from typing import List, Dict
 import re
 
-from app.schemas.common import Scope
-from app.core.paths import resolve_scope_path
 from app.services.document_ingestion import extract_text
 from app.services.chunking import chunk_text
+from app.storage.object_storage import download_from_r2, cleanup_temp_file
 
-
-def ingest_document(document_id: str, metadata: dict) -> None:
+def ingest_document(document_id: str, context: dict) -> List[Dict]:
     """
-    Pure ingestion logic.
-    No in-memory repo.
-    No API logic.
+    Stateless ingestion:
+    - download file from object storage
+    - extract text
+    - normalize
+    - chunk
+    - return chunks
     """
 
-    scope = Scope(
-        scope_type=metadata["scope_type"],
-        owner_id=metadata["owner_id"],
-        team_id=metadata.get("team_id"),
-    )
+    file_url = context["file_url"]
 
-    base_path = resolve_scope_path(scope)
+    temp_path = download_from_r2(file_url)
 
-    raw_path = base_path / "raw" / metadata["raw_filename"]
+    try:
+        # 1️⃣ Extract text directly from temp file
+        extracted_text = extract_text(temp_path)
 
-    extracted_text = extract_text(raw_path)
+        if not extracted_text.strip():
+            return []
 
-    extracted_dir = base_path / "extracted"
-    extracted_dir.mkdir(parents=True, exist_ok=True)
+        # 2️⃣ Normalize
+        normalized = normalize_text(extracted_text)
 
-    extracted_path = extracted_dir / f"{document_id}.txt"
-    extracted_path.write_text(extracted_text, encoding="utf-8")
+        # 3️⃣ Chunk
+        chunks = chunk_text(normalized, chunk_size=200, overlap=50)
 
-    chunks = process_document(extracted_path)
+        return chunks
 
-    # Later: push to vector DB
-    # Later: persist chunk metadata
-
-    return chunks
+    finally:
+        cleanup_temp_file(temp_path)
 
 def normalize_text(text: str) -> str:
     """
@@ -50,39 +47,3 @@ def normalize_text(text: str) -> str:
     text = re.sub(r"\s+", " ", text)  # collapse all whitespace to single space
     text = text.strip()
     return text
-
-def load_extracted_text(extracted_path: Path) -> str:
-    """
-    Load extracted text from a file.
-    """
-    if not extracted_path.exists():
-        raise FileNotFoundError(f"Extracted file not found: {extracted_path}")
-
-    return extracted_path.read_text(encoding="utf-8", errors="ignore")
-
-def process_document(extracted_path: Path, chunk_size: int = 200, overlap: int = 50) -> List[Dict]:
-    """
-    Load extracted text, normalize it, split into chunks.
-    Returns a list of chunks with metadata:
-    [
-        {
-            "chunk_id": str,
-            "chunk_index": int,
-            "text": str
-        }
-    ]
-    """
-    # 1️⃣ Load text
-    text = load_extracted_text(extracted_path)
-
-    if not text.strip():
-        # No text to process
-        return []
-
-    # 2️⃣ Normalize
-    text = normalize_text(text)
-
-    # 3️⃣ Chunk
-    chunks = chunk_text(text, chunk_size=chunk_size, overlap=overlap)
-
-    return chunks

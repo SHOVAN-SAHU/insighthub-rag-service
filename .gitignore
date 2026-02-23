@@ -26,6 +26,3 @@ celerybeat-schedule
 
 # Logs
 *.log
-
-# Storage (optional if not needed in repo)
-app/storage/
