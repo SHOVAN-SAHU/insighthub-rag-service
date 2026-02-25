@@ -8,11 +8,12 @@ from app.storage.object_storage import download_from_r2, cleanup_temp_file
 def ingest_document(document_id: str, context: dict) -> List[Dict]:
     """
     Stateless ingestion:
-    - download file from object storage
+    - download file
     - extract text
     - normalize
     - chunk
-    - return chunks
+    - attach document_id
+    - return enriched chunks
     """
 
     file_url = context["file_url"]
@@ -20,30 +21,32 @@ def ingest_document(document_id: str, context: dict) -> List[Dict]:
     temp_path = download_from_r2(file_url)
 
     try:
-        # 1️⃣ Extract text directly from temp file
         extracted_text = extract_text(temp_path)
 
         if not extracted_text.strip():
             return []
 
-        # 2️⃣ Normalize
         normalized = normalize_text(extracted_text)
 
-        # 3️⃣ Chunk
-        chunks = chunk_text(normalized, chunk_size=200, overlap=50)
+        raw_chunks = chunk_text(normalized, chunk_size=200, overlap=50)
 
-        return chunks
+        # Attach document_id
+        enriched_chunks = []
+
+        for chunk in raw_chunks:
+            enriched_chunks.append({
+                "chunk_id": chunk["chunk_id"],
+                "document_id": document_id,
+                "chunk_index": chunk["chunk_index"],
+                "text": chunk["text"],
+            })
+
+        return enriched_chunks
 
     finally:
         cleanup_temp_file(temp_path)
 
+
 def normalize_text(text: str) -> str:
-    """
-    Normalize text before chunking:
-    - collapse multiple spaces
-    - strip leading/trailing whitespace
-    - replace newlines with spaces where appropriate
-    """
-    text = re.sub(r"\s+", " ", text)  # collapse all whitespace to single space
-    text = text.strip()
-    return text
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()

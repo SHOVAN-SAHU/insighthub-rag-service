@@ -1,13 +1,10 @@
-import os
+from .config import settings
 from celery import Celery
-
-broker_url = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
-result_backend = os.getenv("CELERY_RESULT_BACKEND", broker_url)
 
 celery_app = Celery(
     "rag_service",
-    broker=broker_url,
-    backend=result_backend,
+    broker=settings.celery_broker_url,
+    backend=settings.celery_result_backend,
     include=["app.tasks.ingestion_tasks"],
 )
 
