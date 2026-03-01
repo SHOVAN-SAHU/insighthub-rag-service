@@ -1,37 +1,37 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Depends, Security
+from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel
 from app.tasks.ingestion_tasks import ingest_document_task
-from typing import Literal, Optional
+from app.core.config import settings
 
 router = APIRouter()
+
+api_key_header = APIKeyHeader(name="X-API-KEY")
 
 class ProcessDocumentRequest(BaseModel):
     document_id: str
     file_url: str
-    scope_type: Literal["personal", "team"]
-    owner_id: str
-    team_id: Optional[str] = None
-
+    user_id: str
+    space_type: str  # "personal" or "team"
+    space_id: str | None = None # team_id if space_type == "team"
 
 @router.post("/process")
-async def process_document(payload: ProcessDocumentRequest):
+async def process_document(
+    payload: ProcessDocumentRequest,
+    x_api_key: str = Security(api_key_header)
+):
 
-    # ---- invariant checks (NOT auth) ----
-    if payload.scope_type == "personal" and payload.team_id is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="team_id not allowed for personal scope"
-        )
-
-    if payload.scope_type == "team" and payload.team_id is None:
-        raise HTTPException(
-            status_code=400,
-            detail="team_id is required for team scope"
-        )
+    if x_api_key != settings.api_key:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
     ingest_document_task.delay(
         payload.document_id,
-        payload.model_dump()
+        {
+            "file_url": payload.file_url,
+            "user_id": payload.user_id,
+            "space_type": payload.space_type,
+            "space_id": payload.space_id
+        }
     )
 
     return {"message": "Processing started"}
