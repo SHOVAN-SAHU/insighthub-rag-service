@@ -8,9 +8,8 @@ class SpaceType(str, Enum):
     team = "team"
 
 
-class ProcessDocumentRequest(BaseModel):
-    document_id: str
-    file_url: str
+class AskQuestionRequest(BaseModel):
+    question: str
     user_id: str
     space_type: SpaceType
     space_id: Optional[str] = None

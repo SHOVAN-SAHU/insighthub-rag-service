@@ -25,7 +25,7 @@ def create_app() -> FastAPI:
     )
 
     @app.get("/")
-    def home():
+    async def home():
         return {"message": "Hello World"}
 
     app.include_router(api_router, prefix="/api/v1")

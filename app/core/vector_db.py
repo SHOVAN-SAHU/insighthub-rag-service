@@ -1,7 +1,8 @@
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams, PointStruct, PayloadSchemaType
 from app.core.config import settings
 
+print("QDRANT URL RAW:", repr(settings.qdrant_url))
 client = QdrantClient(
     url=settings.qdrant_url,
     api_key=settings.qdrant_api_key
@@ -19,6 +20,32 @@ def create_collection(collection_name: str):
                 distance=Distance.COSINE
             )
         )
+
+        # Below code in here is new.
+        # Create indexes
+        indexed_fields = ["user_id", "space_type"]
+
+        for field in indexed_fields:
+            client.create_payload_index(
+                collection_name=collection_name,
+                field_name=field,
+                field_schema=PayloadSchemaType.KEYWORD,
+            )
+
+        # ---- Fetch collection info ----
+        collection_info = client.get_collection(collection_name)
+
+        # Extract indexed fields
+        payload_indexes = collection_info.payload_schema
+
+        print(f"Collection '{collection_name}' created.")
+        print("Payload indexes:")
+
+        if payload_indexes:
+            for field_name in payload_indexes:
+                print(f" - {field_name}")
+        else:
+            print("No payload indexes found.")
 
 
 def upsert_chunks(collection_name: str, chunks: list):

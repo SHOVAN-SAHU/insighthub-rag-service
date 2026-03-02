@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     qdrant_url: str = Field(..., env="QDRANT_URL")
     qdrant_api_key: str = Field(..., env="QDRANT_API_KEY")
 
+    groq_api_key: str = Field(..., env="GROQ_API_KEY")
+    groq_model: str = Field("llama3-8b-8192", env="GROQ_MODEL")
+
     model_config = {
         "env_file": ".env"
     }
