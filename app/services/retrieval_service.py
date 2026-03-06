@@ -1,5 +1,6 @@
 from typing import List, Dict, Tuple
 from fastapi.concurrency import run_in_threadpool
+from qdrant_client.http.exceptions import UnexpectedResponse
 
 from app.core.config import settings
 from app.core.mongo_async import get_database
@@ -13,7 +14,7 @@ ANSWER_BUFFER = 1200
 SYSTEM_AND_QUESTION_BUFFER = 1000
 MAX_CONTEXT_TOKENS = MODEL_CONTEXT_LIMIT - ANSWER_BUFFER - SYSTEM_AND_QUESTION_BUFFER
 
-SIMILARITY_THRESHOLD = 0.75
+SIMILARITY_THRESHOLD = 0.35
 RETRIEVAL_LIMIT = 20
 
 
@@ -32,7 +33,7 @@ async def search_similar_chunks(
     user_id: str,
     space_type: str,
     space_id: str | None,
-):
+) -> List:
     filter_payload = {
         "must": [
             {"key": "user_id", "match": {"value": user_id}},
@@ -47,14 +48,27 @@ async def search_similar_chunks(
 
     print(f"Before search for the points, filter payload: {filter_payload}")
 
-    return await run_in_threadpool(
-        lambda: qdrant_client.query_points(
-            collection_name=settings.collection_name,
-            query=query_embedding,
-            limit=RETRIEVAL_LIMIT,
-            query_filter=filter_payload,
+    try:
+        result = await run_in_threadpool(
+            lambda: qdrant_client.query_points(
+                collection_name=settings.collection_name,
+                query=query_embedding,
+                limit=RETRIEVAL_LIMIT,
+                query_filter=filter_payload,
+            )
         )
-    )
+        return result.points
+
+    except UnexpectedResponse as e:
+        if e.status_code == 404:
+            raise CollectionNotFoundException(
+                f"Vector collection '{settings.collection_name}' does not exist. "
+                "Please upload documents before querying."
+            )
+        raise VectorSearchException(f"Qdrant error ({e.status_code}): {e.content}") from e
+
+    except Exception as e:
+        raise VectorSearchException(f"Unexpected error during vector search: {str(e)}") from e
 
 
 async def fetch_chunks_batch(
@@ -84,7 +98,7 @@ async def fetch_chunks_batch(
     return chunk_map
 
 
-async def build_context_from_results(results) -> str:
+async def build_context_from_results(results: List) -> str:
     filtered = [
         r for r in results if r.score >= SIMILARITY_THRESHOLD
     ]
@@ -126,8 +140,6 @@ async def build_context_from_results(results) -> str:
         selected_chunks.append(structured_chunk)
         current_tokens += chunk_tokens
 
-    print("After all operation inside build_context_from_results")
-
     return "\n".join(selected_chunks)
 
 
@@ -149,6 +161,20 @@ async def retrieve_context(
         space_id=space_id,
     )
 
-    print(f"Before build_context_from_results")
+    print(f"Before build_context_from_results, points found: {len(results)}")
+    for r in results:
+        print(f"Score: {r.score}, chunk: {r.payload}")
 
     return await build_context_from_results(results)
+
+
+# ── Custom exceptions ────────────────────────────────────────────────────────
+
+class CollectionNotFoundException(Exception):
+    """Raised when the Qdrant collection does not exist."""
+    pass
+
+
+class VectorSearchException(Exception):
+    """Raised on any other Qdrant / vector search failure."""
+    pass

@@ -1,8 +1,11 @@
 from fastapi import APIRouter, HTTPException, Security
 from fastapi.security.api_key import APIKeyHeader
-from pydantic import BaseModel
 from app.tasks.ingestion_tasks import ingest_document_task
-from app.services.retrieval_service import retrieve_context
+from app.services.retrieval_service import (
+    retrieve_context,
+    CollectionNotFoundException,
+    VectorSearchException,
+)
 from app.services.llm_service import generate_answer_async
 from app.core.config import settings
 
@@ -10,7 +13,6 @@ from app.schemas.document import ProcessDocumentRequest
 from app.schemas.question import AskQuestionRequest
 
 router = APIRouter()
-
 api_key_header = APIKeyHeader(name="X-API-KEY")
 
 
@@ -47,35 +49,69 @@ async def ask_question(
 
     if not payload.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
-    
-    print("Before retrieve_context")
 
     # 1️⃣ Retrieve context (async)
-    context = await retrieve_context(
-        question=payload.question,
-        user_id=payload.user_id,
-        space_type=payload.space_type.value,
-        space_id=payload.space_id,
-    )
+    try:
+        context = await retrieve_context(
+            question=payload.question,
+            user_id=payload.user_id,
+            space_type=payload.space_type.value,
+            space_id=payload.space_id,
+        )
 
-    # Optional: handle no context found
+    except CollectionNotFoundException as e:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "collection_not_found",
+                "message": str(e),
+            }
+        )
+
+    except VectorSearchException as e:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "vector_search_failed",
+                "message": str(e),
+            }
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": f"An unexpected error occurred: {str(e)}",
+            }
+        )
+
+    # Handle no context found
     if not context:
         return {
             "question": payload.question,
             "answer": "No relevant information found in your documents.",
-            "context_used": False
+            "context_used": False,
         }
-    
-    print("Before generate_answer_async")
 
     # 2️⃣ Generate answer
-    answer = await generate_answer_async(
-        question=payload.question,
-        context=context,
-    )
+    try:
+        answer = await generate_answer_async(
+            question=payload.question,
+            context=context,
+        )
+
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "error": "llm_error",
+                "message": str(e),
+            }
+        )
 
     return {
         "question": payload.question,
         "answer": answer,
-        "context_used": True
+        "context_used": True,
     }
