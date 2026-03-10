@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Security
+from fastapi import APIRouter, HTTPException, Security, Depends
 from fastapi.security.api_key import APIKeyHeader
 from app.tasks.ingestion_tasks import ingest_document_task
+from app.tasks.document_tasks import delete_document_task
 from app.services.retrieval_service import (
     retrieve_context,
     CollectionNotFoundException,
@@ -9,8 +10,10 @@ from app.services.retrieval_service import (
 from app.services.llm_service import generate_answer_async
 from app.core.config import settings
 
-from app.schemas.document import ProcessDocumentRequest
+from app.schemas.document import ProcessDocumentRequest, DeleteDocumentRequest
 from app.schemas.question import AskQuestionRequest
+from app.core.mongo_async import get_database
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 router = APIRouter()
 api_key_header = APIKeyHeader(name="X-API-KEY")
@@ -114,4 +117,71 @@ async def ask_question(
         "question": payload.question,
         "answer": answer,
         "context_used": True,
+    }
+
+
+@router.get("/{document_id}/status")
+async def get_document_status(
+    document_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_database),
+    x_api_key: str = Security(api_key_header),
+):
+
+    # API key check
+    if x_api_key != settings.api_key:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    document = await db.documents.find_one(
+        {"document_id": document_id},
+        {"_id": 0, "document_id": 1, "status": 1}
+    )
+
+    if not document:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
+
+    return document
+
+
+@router.delete("/{document_id}")
+async def delete_document(
+    document_id: str,
+    payload: DeleteDocumentRequest,
+    db: AsyncIOMotorDatabase = Depends(get_database),
+    x_api_key: str = Security(api_key_header),
+):
+
+    if x_api_key != settings.api_key:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    query = {
+        "document_id": document_id,
+        "user_id": payload.user_id,
+        "space_type": payload.space_type.value,
+        "status": {"$nin": ["deleting", "deleted"]}
+    }
+
+    if payload.space_id is not None:
+        query["space_id"] = payload.space_id
+    else:
+        query["space_id"] = None
+
+    result = await db.documents.update_one(
+        query,
+        {"$set": {"status": "deleting"}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found or already deleting"
+        )
+
+    task = delete_document_task.delay(document_id)
+
+    return {
+        "message": "Document deletion started",
+        "task_id": task.id
     }

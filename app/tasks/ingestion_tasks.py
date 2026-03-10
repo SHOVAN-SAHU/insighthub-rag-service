@@ -38,7 +38,14 @@ def ingest_document_task(self, document_id: str, metadata: dict):
         # Mark as processing
         db.documents.update_one(
             {"document_id": document_id},
-            {"$set": {"status": "processing"}},
+            {
+                "$set": {
+                    "status": "processing",
+                    "user_id": metadata["user_id"],
+                    "space_type": metadata["space_type"],
+                    "space_id": metadata.get("space_id"),
+                }
+            },
             upsert=True,
         )
 
@@ -81,6 +88,9 @@ def ingest_document_task(self, document_id: str, metadata: dict):
                 "document_id": document_id,
                 "chunk_index": chunk["chunk_index"],
                 "text": chunk["text"],
+                "user_id": metadata["user_id"],
+                "space_type": metadata["space_type"],
+                "space_id": metadata.get("space_id"),
             }
             for chunk in chunks
         ]
@@ -89,7 +99,11 @@ def ingest_document_task(self, document_id: str, metadata: dict):
         # 6️⃣ Mark completed
         db.documents.update_one(
             {"document_id": document_id},
-            {"$set": {"status": "completed"}},
+            {
+                "$set": {
+                    "status": "completed"
+                }
+            },
         )
 
         print(f"Document '{document_id}' ingested successfully.")

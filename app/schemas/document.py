@@ -14,3 +14,8 @@ class ProcessDocumentRequest(BaseModel):
     user_id: str
     space_type: SpaceType
     space_id: Optional[str] = None
+
+class DeleteDocumentRequest(BaseModel):
+    user_id: str
+    space_type: SpaceType
+    space_id: Optional[str] = None

@@ -9,11 +9,15 @@ celery_app = Celery(
     "rag_service",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["app.tasks.ingestion_tasks"],
+    include=[
+        "app.tasks.ingestion_tasks",
+        "app.tasks.document_tasks",
+    ],
 )
 
 celery_app.conf.task_routes = {
     "app.tasks.ingestion_tasks.ingest_document_task": {"queue": "celery"},
+    "app.tasks.document_tasks.delete_document_task": {"queue": "celery"},
 }
 
 celery_app.conf.update(

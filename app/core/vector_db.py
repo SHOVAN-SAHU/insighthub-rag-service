@@ -1,5 +1,5 @@
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct, PayloadSchemaType
+from qdrant_client.models import Distance, VectorParams, PointStruct, PayloadSchemaType, Filter, FieldCondition, MatchValue
 from qdrant_client.http.exceptions import UnexpectedResponse
 
 from app.core.config import settings
@@ -46,8 +46,8 @@ def create_collection(collection_name: str) -> None:
         ),
     )
 
-    # Payload indexes for fast filtered search on user_id and space_type
-    for field in ["user_id", "space_type"]:
+    # Payload indexes for fast filtered search
+    for field in ["user_id", "space_type", "space_id", "document_id"]:
         client.create_payload_index(
             collection_name=collection_name,
             field_name=field,
@@ -74,6 +74,10 @@ def upsert_chunks(collection_name: str, chunks: list) -> None:
         return
 
     client = get_vector_client()
+
+    if not client.collection_exists(collection_name):
+        create_collection(collection_name)
+    
     points = []
 
     for chunk in chunks:
@@ -113,3 +117,20 @@ def upsert_chunks(collection_name: str, chunks: list) -> None:
         raise RuntimeError(
             f"Unexpected error during upsert into '{collection_name}': {str(e)}"
         ) from e
+
+# ── Delete ───────────────────────────────────────────────────────────────────
+
+def delete_document_vectors(collection_name: str, document_id: str):
+
+    client = get_vector_client()
+    client.delete(
+        collection_name=collection_name,
+        points_selector=Filter(
+            must=[
+                FieldCondition(
+                    key="document_id",
+                    match=MatchValue(value=document_id)
+                )
+            ]
+        )
+    )

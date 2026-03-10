@@ -40,8 +40,11 @@ async def search_similar_chunks(
             {"key": "space_type", "match": {"value": space_type}},
         ]
     }
+    
+    if space_type == "team":
+        if not space_id:
+            raise ValueError("space_id required for team space")
 
-    if space_type == "team" and space_id:
         filter_payload["must"].append(
             {"key": "space_id", "match": {"value": space_id}}
         )
@@ -72,7 +75,10 @@ async def search_similar_chunks(
 
 
 async def fetch_chunks_batch(
-    keys: List[Tuple[str, int]]
+    keys: List[Tuple[str, int]],
+    user_id: str,
+    space_type: str,
+    space_id: str | None,
 ) -> Dict[Tuple[str, int], str]:
 
     if not keys:
@@ -82,11 +88,20 @@ async def fetch_chunks_batch(
     chunks_collection = db["chunks"]
 
     query = {
+        "user_id": user_id,
+        "space_type": space_type,
         "$or": [
             {"document_id": doc_id, "chunk_index": chunk_idx}
             for doc_id, chunk_idx in keys
         ]
     }
+
+    if space_type == "team":
+        query["space_id"] = space_id
+    else:
+        query["space_id"] = None
+
+    print(f"Chunk fetching query: {query}")
 
     cursor = chunks_collection.find(query)
 
@@ -98,7 +113,12 @@ async def fetch_chunks_batch(
     return chunk_map
 
 
-async def build_context_from_results(results: List) -> str:
+async def build_context_from_results(
+    results: List,
+    user_id: str,
+    space_type: str,
+    space_id: str | None,
+) -> str:
     filtered = [
         r for r in results if r.score >= SIMILARITY_THRESHOLD
     ]
@@ -113,7 +133,12 @@ async def build_context_from_results(results: List) -> str:
 
     print(f"before fetch chunks: {keys}")
 
-    chunk_map = await fetch_chunks_batch(keys)
+    chunk_map = await fetch_chunks_batch(
+        keys,
+        user_id=user_id,
+        space_type=space_type,
+        space_id=space_id,
+    )
 
     selected_chunks = []
     current_tokens = 0
@@ -165,7 +190,12 @@ async def retrieve_context(
     for r in results:
         print(f"Score: {r.score}, chunk: {r.payload}")
 
-    return await build_context_from_results(results)
+    return await build_context_from_results(
+        results,
+        user_id=user_id,
+        space_type=space_type,
+        space_id=space_id,
+    )
 
 
 # ── Custom exceptions ────────────────────────────────────────────────────────
