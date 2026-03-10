@@ -49,14 +49,19 @@ async def ask_question(
     # 🔐 API Key Check
     if x_api_key != settings.api_key:
         raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    question = payload.question.strip()
 
-    if not payload.question.strip():
+    if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty")
+    
+    if len(question) > 2000:
+        raise HTTPException(400, "Question too long")
 
     # 1️⃣ Retrieve context (async)
     try:
         context = await retrieve_context(
-            question=payload.question,
+            question=question,
             user_id=payload.user_id,
             space_type=payload.space_type.value,
             space_id=payload.space_id,
@@ -92,7 +97,7 @@ async def ask_question(
     # Handle no context found
     if not context:
         return {
-            "question": payload.question,
+            "question": question,
             "answer": "No relevant information found in your documents.",
             "context_used": False,
         }
@@ -100,7 +105,7 @@ async def ask_question(
     # 2️⃣ Generate answer
     try:
         answer = await generate_answer_async(
-            question=payload.question,
+            question=question,
             context=context,
         )
 
@@ -114,7 +119,7 @@ async def ask_question(
         )
 
     return {
-        "question": payload.question,
+        "question": question,
         "answer": answer,
         "context_used": True,
     }
