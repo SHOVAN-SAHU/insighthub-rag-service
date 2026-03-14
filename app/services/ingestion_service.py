@@ -3,7 +3,7 @@ import re
 
 from app.services.document_ingestion import extract_text
 from app.services.chunking import chunk_text
-from app.storage.object_storage import download_from_r2, cleanup_temp_file
+from app.services.download_service import download_from_r2, cleanup_temp_file
 
 def ingest_document(document_id: str, context: dict) -> List[Dict]:
     """

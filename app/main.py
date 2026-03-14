@@ -25,8 +25,11 @@ def create_app() -> FastAPI:
     )
 
     @app.get("/")
-    async def home():
-        return {"message": "Hello World"}
+    def health_check():
+        return {
+            "status": "ok",
+            "service": "rag-service"
+        }
 
     app.include_router(api_router, prefix="/api/v1")
 

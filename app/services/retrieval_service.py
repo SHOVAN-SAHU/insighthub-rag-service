@@ -23,9 +23,13 @@ def estimate_tokens(text: str) -> int:
 
 
 async def generate_query_embedding(question: str) -> List[float]:
-    return await run_in_threadpool(
-        lambda: generate_embeddings([question])[0]
-    )
+    # return await run_in_threadpool(
+    #     lambda: generate_embeddings([question])[0]
+    # )
+    def task():
+        return generate_embeddings([question])[0]
+
+    return await run_in_threadpool(task)
 
 
 async def search_similar_chunks(

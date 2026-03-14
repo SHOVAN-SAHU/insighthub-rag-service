@@ -13,8 +13,8 @@ class Settings(BaseSettings):
         env="HF_EMBED_MODEL"
     )
 
-    celery_broker_url: str = Field(..., env="CELERY_BROKER_URL")
-    celery_result_backend: str = Field(..., env="CELERY_RESULT_BACKEND")
+    # celery_broker_url: str = Field(..., env="CELERY_BROKER_URL")
+    # celery_result_backend: str = Field(..., env="CELERY_RESULT_BACKEND")
 
     mongo_uri: str
     mongo_db_name: str = "rag_service_db"
