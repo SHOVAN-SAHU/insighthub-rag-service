@@ -14,6 +14,7 @@ from app.core.mongo_async import get_database
 from app.services.document_service import process_document_service, delete_document_service
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+# Imported background workers
 # from app.tasks.ingestion_tasks import ingest_document_task
 # from app.tasks.document_tasks import delete_document_task
 
@@ -203,6 +204,8 @@ async def delete_document(
 
     return {"message": "Document deleted successfully"}
 
+
+# API's with background workers
 
 # @router.post("/process")
 # async def process_document(
