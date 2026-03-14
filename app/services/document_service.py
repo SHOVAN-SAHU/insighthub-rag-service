@@ -16,6 +16,9 @@ async def process_document_service(db, document_id: str, metadata: dict):
             {
                 "$set": {
                     "status": "processing",
+                    "user_id": metadata["user_id"],
+                    "space_type": metadata["space_type"],
+                    "space_id": metadata.get("space_id"),
                     "updated_at": datetime.now(timezone.utc)
                 },
                 "$setOnInsert": {
