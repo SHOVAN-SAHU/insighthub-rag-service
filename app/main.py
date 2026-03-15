@@ -6,13 +6,11 @@ from app.core.mongo_async import connect_to_mongo, close_mongo_connection
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     await connect_to_mongo()
     print("MongoDB connected")
 
     yield
 
-    # Shutdown
     await close_mongo_connection()
     print("MongoDB disconnected")
 
@@ -24,12 +22,13 @@ def create_app() -> FastAPI:
         lifespan=lifespan
     )
 
-    @app.get("/")
-    def health_check():
-        return {
-            "status": "ok",
-            "service": "rag-service"
-        }
+    @app.api_route("/health", methods=["GET", "HEAD"])
+    async def health_check():
+        return {"status": "ok"}
+
+    @app.api_route("/", methods=["GET", "HEAD"])
+    async def home():
+        return {"status": "ok", "service": "rag-service"}
 
     app.include_router(api_router, prefix="/api/v1")
 

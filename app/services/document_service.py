@@ -101,19 +101,24 @@ async def delete_document_service(db, document_id: str):
 
         await db.documents.update_one(
             {"document_id": document_id},
-            {"$set": {"status": "deleted"}}
+            {
+                "$set": {
+                    "status": "deleted",
+                    "chunk_count": 0
+                }
+            }
         )
 
     except Exception as e:
         print(f"Deletion failed for {document_id}: {e}")
         await db.documents.update_one(
-                  {"document_id": document_id},
-                  {"$set": 
-                      {"status": 
-                          "delete_failed", 
-                          "error": str(e),
-                          "updated_at": datetime.now(timezone.utc)
-                      }
-                  }
-              )
+            {"document_id": document_id},
+            {
+                "$set": {
+                    "status": "delete_failed", 
+                    "error": str(e),
+                    "updated_at": datetime.now(timezone.utc)
+                }
+            }
+        )
         raise
