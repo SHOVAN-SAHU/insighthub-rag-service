@@ -1,12 +1,12 @@
 import httpx
 from app.core.config import settings
 
-NODE_API_URL = settings.node_api_url
+API_SERVICE_URL = settings.api_service_url
 API_KEY = settings.api_key
 
 
 async def update_document_status(document_id: str, status: str, error_message: str = None):
-    url = f"{NODE_API_URL}/api/v1/documents/{document_id}/status"
+    url = f"{API_SERVICE_URL}/api/v1/documents/{document_id}/status"
 
     payload = {
         "status": status,
