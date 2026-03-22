@@ -13,6 +13,7 @@ from app.schemas.question import AskQuestionRequest
 from app.core.mongo_async import get_database
 from app.services.document_service import process_document_service, delete_document_service
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from app.services.node_api import update_document_status
 
 # Imported background workers
 # from app.tasks.ingestion_tasks import ingest_document_task
@@ -40,8 +41,25 @@ async def process_document(
     }
 
     await process_document_service(db, payload.document_id, metadata)
-
     return {"message": "Processing completed"}
+
+    # try:
+    #     await process_document_service(db, payload.document_id, metadata)
+
+    #     # SUCCESS → notify api service
+    #     await update_document_status(payload.document_id, "ready")
+
+    #     return {"message": "Processing completed"}
+
+    # except Exception as e:
+    #     # FAILURE → notify api service
+    #     await update_document_status(
+    #         payload.document_id,
+    #         "failed",
+    #         str(e)
+    #     )
+
+    #     raise HTTPException(status_code=500, detail="Processing failed")
 
 
 @router.post("/ask")
@@ -188,15 +206,14 @@ async def delete_document(
         "status": {"$nin": ["deleting", "deleted"]}
     }
 
-    # if payload.space_id is not None:
-    #     query["space_id"] = payload.space_id
-    # else:
-    #     query["space_id"] = None
-
     result = await db.documents.update_one(
         query,
         {"$set": {"status": "deleting"}}
     )
+
+    print(f"raw payload: {payload}")
+    print(f"query with str: {query}")
+    print(f"after update: {result}")
 
     if result.modified_count == 0:
         raise HTTPException(

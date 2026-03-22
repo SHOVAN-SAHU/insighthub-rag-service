@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     groq_api_key: str = Field(..., env="GROQ_API_KEY")
     groq_model: str = Field("llama-3.1-8b-instant", env="GROQ_MODEL")
 
+    node_api_url: str = Field(..., env="API_SERVICE_URL")
+
     model_config = {
         "env_file": ".env"
     }

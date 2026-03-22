@@ -14,3 +14,4 @@ dnspython==2.8.0
 qdrant-client==1.17.0
 groq==1.0.0
 # honcho==2.0.0
+httpx==0.28.1
