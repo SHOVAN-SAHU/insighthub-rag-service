@@ -18,7 +18,7 @@ async def process_document_service(db, document_id: str, metadata: dict):
                     "status": "processing",
                     "user_id": metadata["user_id"],
                     "space_type": metadata["space_type"],
-                    "space_id": metadata.get("space_id"),
+                    "space_id": metadata["space_id"],
                     "updated_at": datetime.now(timezone.utc)
                 },
                 "$setOnInsert": {
@@ -40,7 +40,7 @@ async def process_document_service(db, document_id: str, metadata: dict):
             chunk["embedding"] = embedding
             chunk["user_id"] = metadata["user_id"]
             chunk["space_type"] = metadata["space_type"]
-            chunk["space_id"] = metadata.get("space_id")
+            chunk["space_id"] = metadata["space_id"]
 
         upsert_chunks(COLLECTION_NAME, chunks)
 
@@ -52,7 +52,7 @@ async def process_document_service(db, document_id: str, metadata: dict):
                 "text": c["text"],
                 "user_id": metadata["user_id"],
                 "space_type": metadata["space_type"],
-                "space_id": metadata.get("space_id")
+                "space_id": metadata["space_id"]
             }
             for c in chunks
         ]

@@ -60,14 +60,8 @@ async def ask_question(
     
     if len(question) > 2000:
         raise HTTPException(400, "Question too long")
-    
-    if payload.space_type.value == "team" and not payload.space_id:
-        raise HTTPException(
-            status_code=400,
-            detail="space_id is required for team space"
-        )
 
-    # 1️⃣ Retrieve context (async)
+    # Retrieve context (async)
     try:
         context = await retrieve_context(
             question=question,
@@ -111,7 +105,7 @@ async def ask_question(
             "context_used": False,
         }
 
-    # 2️⃣ Generate answer
+    # Generate answer
     try:
         answer = await generate_answer_async(
             question=question,
@@ -176,18 +170,28 @@ async def delete_document(
 
     if x_api_key != settings.api_key:
         raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    if not document_id:
+        raise HTTPException(status_code=400, detail="Document id is required")
+    if not payload.user_id:
+        raise HTTPException(status_code=400, detail="Uploader id is required")
+    if not payload.space_id:
+        raise HTTPException(status_code=400, detail="Space id is required")
+    if not payload.space_type.value:
+        raise HTTPException(status_code=400, detail="Space type is required")
 
     query = {
-        "document_id": document_id,
-        "user_id": payload.user_id,
+        "document_id": str(document_id),
+        "user_id": str(payload.user_id),
+        "space_id": str(payload.space_id),
         "space_type": payload.space_type.value,
         "status": {"$nin": ["deleting", "deleted"]}
     }
 
-    if payload.space_id is not None:
-        query["space_id"] = payload.space_id
-    else:
-        query["space_id"] = None
+    # if payload.space_id is not None:
+    #     query["space_id"] = payload.space_id
+    # else:
+    #     query["space_id"] = None
 
     result = await db.documents.update_one(
         query,

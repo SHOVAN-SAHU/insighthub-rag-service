@@ -13,9 +13,9 @@ class ProcessDocumentRequest(BaseModel):
     file_url: str
     user_id: str
     space_type: SpaceType
-    space_id: Optional[str] = None
+    space_id: str
 
 class DeleteDocumentRequest(BaseModel):
     user_id: str
     space_type: SpaceType
-    space_id: Optional[str] = None
+    space_id: str
