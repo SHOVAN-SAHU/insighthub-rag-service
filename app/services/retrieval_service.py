@@ -82,7 +82,7 @@ async def fetch_chunks_batch(
     keys: List[Tuple[str, int]],
     user_id: str,
     space_type: str,
-    space_id: str | None,
+    space_id: str,
 ) -> Dict[Tuple[str, int], str]:
 
     if not keys:
@@ -94,16 +94,12 @@ async def fetch_chunks_batch(
     query = {
         "user_id": user_id,
         "space_type": space_type,
+        "space_id": space_id,
         "$or": [
             {"document_id": doc_id, "chunk_index": chunk_idx}
             for doc_id, chunk_idx in keys
         ]
     }
-
-    if space_type == "team":
-        query["space_id"] = space_id
-    else:
-        query["space_id"] = None
 
     print(f"Chunk fetching query: {query}")
 
@@ -121,7 +117,7 @@ async def build_context_from_results(
     results: List,
     user_id: str,
     space_type: str,
-    space_id: str | None,
+    space_id: str,
 ) -> str:
     filtered = [
         r for r in results if r.score >= SIMILARITY_THRESHOLD
@@ -176,7 +172,7 @@ async def retrieve_context(
     question: str,
     user_id: str,
     space_type: str,
-    space_id: str | None = None,
+    space_id: str,
 ) -> str:
 
     query_embedding = await generate_query_embedding(question)
@@ -190,9 +186,7 @@ async def retrieve_context(
         space_id=space_id,
     )
 
-    print(f"Before build_context_from_results, points found: {len(results)}")
-    for r in results:
-        print(f"Score: {r.score}, chunk: {r.payload}")
+    print(f"Points found: {len(results)}")
 
     return await build_context_from_results(
         results,

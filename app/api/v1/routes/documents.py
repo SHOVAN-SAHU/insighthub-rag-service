@@ -211,9 +211,7 @@ async def delete_document(
         {"$set": {"status": "deleting"}}
     )
 
-    print(f"raw payload: {payload}")
     print(f"query with str: {query}")
-    print(f"after update: {result}")
 
     if result.modified_count == 0:
         raise HTTPException(
