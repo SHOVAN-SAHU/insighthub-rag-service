@@ -46,13 +46,13 @@ async def process_document(
     try:
         await process_document_service(db, payload.document_id, metadata)
 
-        # SUCCESS → notify api service
+        # Notify api service if the document processing success
         await update_document_status(payload.document_id, "ready")
 
         return {"message": "Processing completed"}
 
     except Exception as e:
-        # FAILURE → notify api service
+        # Notify api service if the document processing failed
         await update_document_status(
             payload.document_id,
             "failed",
