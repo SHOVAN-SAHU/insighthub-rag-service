@@ -40,26 +40,26 @@ async def process_document(
         "space_id": payload.space_id
     }
 
-    await process_document_service(db, payload.document_id, metadata)
-    return {"message": "Processing completed"}
+    # await process_document_service(db, payload.document_id, metadata)
+    # return {"message": "Processing completed"}
 
-    # try:
-    #     await process_document_service(db, payload.document_id, metadata)
+    try:
+        await process_document_service(db, payload.document_id, metadata)
 
-    #     # SUCCESS → notify api service
-    #     await update_document_status(payload.document_id, "ready")
+        # SUCCESS → notify api service
+        await update_document_status(payload.document_id, "ready")
 
-    #     return {"message": "Processing completed"}
+        return {"message": "Processing completed"}
 
-    # except Exception as e:
-    #     # FAILURE → notify api service
-    #     await update_document_status(
-    #         payload.document_id,
-    #         "failed",
-    #         str(e)
-    #     )
+    except Exception as e:
+        # FAILURE → notify api service
+        await update_document_status(
+            payload.document_id,
+            "failed",
+            str(e)
+        )
 
-    #     raise HTTPException(status_code=500, detail="Processing failed")
+        raise HTTPException(status_code=500, detail="Processing failed")
 
 
 @router.post("/ask")
@@ -223,68 +223,3 @@ async def delete_document(
 
     return {"message": "Document deleted successfully"}
 
-
-# API's with background workers
-
-# @router.post("/process")
-# async def process_document(
-#     payload: ProcessDocumentRequest,
-#     x_api_key: str = Security(api_key_header)
-# ):
-
-#     if x_api_key != settings.api_key:
-#         raise HTTPException(status_code=401, detail="Unauthorized")
-
-#     ingest_document_task.delay(
-#         payload.document_id,
-#         {
-#             "file_url": payload.file_url,
-#             "user_id": payload.user_id,
-#             "space_type": payload.space_type.value,
-#             "space_id": payload.space_id
-#         }
-#     )
-
-#     return {"message": "Processing started"}
-
-
-# @router.delete("/{document_id}")
-# async def delete_document(
-#     document_id: str,
-#     payload: DeleteDocumentRequest,
-#     db: AsyncIOMotorDatabase = Depends(get_database),
-#     x_api_key: str = Security(api_key_header),
-# ):
-
-#     if x_api_key != settings.api_key:
-#         raise HTTPException(status_code=401, detail="Unauthorized")
-
-#     query = {
-#         "document_id": document_id,
-#         "user_id": payload.user_id,
-#         "space_type": payload.space_type.value,
-#         "status": {"$nin": ["deleting", "deleted"]}
-#     }
-
-#     if payload.space_id is not None:
-#         query["space_id"] = payload.space_id
-#     else:
-#         query["space_id"] = None
-
-#     result = await db.documents.update_one(
-#         query,
-#         {"$set": {"status": "deleting"}}
-#     )
-
-#     if result.modified_count == 0:
-#         raise HTTPException(
-#             status_code=404,
-#             detail="Document not found or already deleting"
-#         )
-
-#     task = delete_document_task.delay(document_id)
-
-#     return {
-#         "message": "Document deletion started",
-#         "task_id": task.id
-#     }

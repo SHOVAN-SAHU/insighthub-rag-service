@@ -6,7 +6,7 @@ API_KEY = settings.api_key
 
 
 async def update_document_status(document_id: str, status: str, error_message: str = None):
-    url = f"{API_SERVICE_URL}/api/v1/documents/{document_id}/status"
+    url = f"{API_SERVICE_URL}/api/v1/documents/status/{document_id}"
 
     payload = {
         "status": status,
