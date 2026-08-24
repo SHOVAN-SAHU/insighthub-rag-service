@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     qdrant_api_key: str = Field(..., env="QDRANT_API_KEY")
 
     groq_api_key: str = Field(..., env="GROQ_API_KEY")
-    groq_model: str = Field("llama-3.1-8b-instant", env="GROQ_MODEL")
+    groq_model: str = Field("llama-3.3-70b-versatile", env="GROQ_MODEL")
 
     api_service_url: str = Field(..., env="API_SERVICE_URL")
 
