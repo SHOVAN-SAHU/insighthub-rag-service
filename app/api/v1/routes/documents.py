@@ -67,83 +67,86 @@ async def ask_question(
     payload: AskQuestionRequest,
     x_api_key: str = Security(api_key_header)
 ):
-    # 🔐 API Key Check
-    if x_api_key != settings.api_key:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    
-    question = payload.question.strip()
-
-    if not question:
-        raise HTTPException(status_code=400, detail="Question cannot be empty")
-    
-    if len(question) > 2000:
-        raise HTTPException(400, "Question too long")
-
-    # Retrieve context (async)
     try:
-        context = await retrieve_context(
-            question=question,
-            user_id=payload.user_id,
-            space_type=payload.space_type.value,
-            space_id=payload.space_id,
-        )
-
-    except CollectionNotFoundException as e:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "error": "collection_not_found",
-                "message": str(e),
+        # 🔐 API Key Check
+            if x_api_key != settings.api_key:
+                raise HTTPException(status_code=401, detail="Unauthorized")
+            
+            question = payload.question.strip()
+        
+            if not question:
+                raise HTTPException(status_code=400, detail="Question cannot be empty")
+            
+            if len(question) > 2000:
+                raise HTTPException(400, "Question too long")
+        
+            # Retrieve context (async)
+            try:
+                context = await retrieve_context(
+                    question=question,
+                    user_id=payload.user_id,
+                    space_type=payload.space_type.value,
+                    space_id=payload.space_id,
+                )
+        
+            except CollectionNotFoundException as e:
+                raise HTTPException(
+                    status_code=404,
+                    detail={
+                        "error": "collection_not_found",
+                        "message": str(e),
+                    }
+                )
+        
+            except VectorSearchException as e:
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "error": "vector_search_failed",
+                        "message": str(e),
+                    }
+                )
+        
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail={
+                        "error": "internal_error",
+                        "message": f"An unexpected error occurred: {str(e)}",
+                    }
+                )
+        
+            # Handle no context found
+            if not context:
+                return {
+                    "question": question,
+                    "answer": "No relevant information found in your documents.",
+                    "context_used": False,
+                }
+        
+            # Generate answer
+            try:
+                answer = await generate_answer_async(
+                    question=question,
+                    context=context,
+                )
+        
+            except RuntimeError as e:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "error": "llm_error",
+                        "message": str(e),
+                    }
+                )
+        
+            return {
+                "question": question,
+                "answer": answer,
+                "context_used": True,
             }
-        )
-
-    except VectorSearchException as e:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": "vector_search_failed",
-                "message": str(e),
-            }
-        )
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": "internal_error",
-                "message": f"An unexpected error occurred: {str(e)}",
-            }
-        )
-
-    # Handle no context found
-    if not context:
-        return {
-            "question": question,
-            "answer": "No relevant information found in your documents.",
-            "context_used": False,
-        }
-
-    # Generate answer
-    try:
-        answer = await generate_answer_async(
-            question=question,
-            context=context,
-        )
-
-    except RuntimeError as e:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "error": "llm_error",
-                "message": str(e),
-            }
-        )
-
-    return {
-        "question": question,
-        "answer": answer,
-        "context_used": True,
-    }
+    except Exception as e :
+        print(f"error: {e}")
 
 
 @router.get("/{document_id}/status")
