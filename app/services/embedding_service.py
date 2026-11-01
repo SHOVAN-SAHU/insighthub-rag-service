@@ -1,39 +1,35 @@
 from typing import List
-from huggingface_hub import InferenceClient
+from fastembed import TextEmbedding
 from app.core.config import settings
 
+_model: TextEmbedding | None = None
 
-HF_MODEL = settings.hf_embed_model
-HF_TOKEN = settings.hf_api_token
 
-client = InferenceClient(
-    model=HF_MODEL,
-    token=HF_TOKEN,
-)
+def get_embedding_model() -> TextEmbedding:
+    """
+    Lazy initialization of FastEmbed model singleton.
+    Runs locally on ONNX runtime (CPU) for free without external API costs or limits.
+    Produces 384-dimensional embeddings using sentence-transformers/all-MiniLM-L6-v2.
+    """
+    global _model
+    if _model is None:
+        model_name = settings.embed_model or "sentence-transformers/all-MiniLM-L6-v2"
+        _model = TextEmbedding(model_name=model_name)
+    return _model
 
-def _batch(iterable: List[str], size: int = 16):
-    """Split list into smaller batches."""
-    for i in range(0, len(iterable), size):
-        yield iterable[i:i + size]
 
 def generate_embeddings(texts: List[str]) -> List[List[float]]:
     """
-    Generate embeddings for multiple text chunks.
-    Returns list of embedding vectors.
+    Generate embeddings for multiple text chunks using local FastEmbed.
+    Returns list of 384-dimensional embedding vectors.
     """
+    if not texts:
+        return []
 
-    all_embeddings = []
-
-    for batch in _batch(texts, size=16):
-        try:
-            embeddings = client.feature_extraction(batch)
-        except Exception as e:
-            raise Exception(f"HF API Error: {str(e)}")
-
-        # Normalize nested format (HF sometimes returns [[[]]])
-        if isinstance(embeddings[0], list) and isinstance(embeddings[0][0], list):
-            embeddings = [e[0] for e in embeddings]
-
-        all_embeddings.extend(embeddings)
-
-    return all_embeddings
+    try:
+        model = get_embedding_model()
+        # FastEmbed handles batching internally and yields numpy arrays
+        embeddings = list(model.embed(texts, batch_size=32))
+        return [e.tolist() for e in embeddings]
+    except Exception as e:
+        raise RuntimeError(f"Embedding generation error: {str(e)}") from e

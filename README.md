@@ -6,24 +6,24 @@ A high-performance, stateless Retrieval-Augmented Generation (RAG) microservice 
 
 ## 🚀 Key Features
 
-*   **Multi-Format Document Parsing**: Out-of-the-box support for `PDF`, `DOCX`, `CSV`, `TXT`, and `JSON` files.
-*   **Vector Search with Metadata Filtering**: Integrated with **Qdrant** to store and search embeddings with granular scope filters (`user_id`, `space_type`, `space_id`).
-*   **Hybrid Storage Architecture**: Uses **MongoDB** for document/chunk metadata and **Qdrant** for vector search.
-*   **Strict Context-Aware Answers**: Integrates **Groq (Llama 3.1 8B)** to generate precise answers based *only* on the retrieved document context.
-*   **External Service Synchronisation**: Notifies a primary API gateway of document processing states (`processing`, `ready`, `failed`, `deleting`, `deleted`) via HTTP callbacks.
-*   **Dockerized Development**: Easy setup with pre-configured container definitions for local development.
+- **Multi-Format Document Parsing**: Out-of-the-box support for `PDF`, `DOCX`, `CSV`, `TXT`, and `JSON` files.
+- **Vector Search with Metadata Filtering**: Integrated with **Qdrant** to store and search embeddings with granular scope filters (`user_id`, `space_type`, `space_id`).
+- **Hybrid Storage Architecture**: Uses **MongoDB** for document/chunk metadata and **Qdrant** for vector search.
+- **Strict Context-Aware Answers**: Integrates **Groq (Llama 3.1 8B)** to generate precise answers based _only_ on the retrieved document context.
+- **External Service Synchronisation**: Notifies a primary API gateway of document processing states (`processing`, `ready`, `failed`, `deleting`, `deleted`) via HTTP callbacks.
+- **Dockerized Development**: Easy setup with pre-configured container definitions for local development.
 
 ---
 
 ## 🛠️ Technology Stack
 
-*   **Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11)
-*   **Embedding Model**: Hugging Face Inference API (`sentence-transformers/all-MiniLM-L6-v2`, 384 dimensions)
-*   **LLM Provider**: [Groq Cloud SDK](https://wow.groq.com/) (`llama-3.1-8b-instant`)
-*   **Vector DB**: [Qdrant](https://qdrant.tech/) (Distance Metric: Cosine)
-*   **Document DB**: [MongoDB](https://www.mongodb.com/) (using asynchronous `motor` driver)
-*   **Text Parsers**: `pypdf`, `python-docx`
-*   **HTTP Clients**: `requests` (sync), `httpx` (async)
+- **Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11)
+- **Embedding Model**: [FastEmbed](https://github.com/qdrant/fastembed) (`sentence-transformers/all-MiniLM-L6-v2`, 384 dimensions, local ONNX Runtime)
+- **LLM Provider**: [Groq Cloud SDK](https://wow.groq.com/) (`llama-3.1-8b-instant`)
+- **Vector DB**: [Qdrant](https://qdrant.tech/) (Distance Metric: Cosine)
+- **Document DB**: [MongoDB](https://www.mongodb.com/) (using asynchronous `motor` driver)
+- **Text Parsers**: `pypdf`, `python-docx`
+- **HTTP Clients**: `requests` (sync), `httpx` (async)
 
 ---
 
@@ -100,7 +100,7 @@ python-rag-service/
 │   │   ├── document_ingestion.py      # Format-specific parsers (PDF, DOCX, CSV, TXT, JSON)
 │   │   ├── document_service.py        # Coordinator for database and ingestion states
 │   │   ├── download_service.py        # External URL file downloader
-│   │   ├── embedding_service.py       # Hugging Face inference integration
+│   │   ├── embedding_service.py       # FastEmbed local ONNX embedding generation
 │   │   ├── llm_service.py             # Groq completion request wrapper
 │   │   ├── node_api.py                # HTTP status update dispatcher to external gateway
 │   │   └── retrieval_service.py       # Context search pipelines and context trimming
@@ -122,9 +122,8 @@ python-rag-service/
 Create a `.env` file in the root directory. Here is the template for keys required by the service:
 
 ```ini
-# Hugging Face Settings
-HF_API_TOKEN=your_huggingface_api_token
-HF_EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2
+# Embedding model Settings
+EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2
 
 # MongoDB Database Settings
 MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/rag_service_db?retryWrites=true&w=majority
@@ -153,28 +152,33 @@ All API requests (except `/health` and `/`) require the authentication header:
 `X-API-KEY: <your_rag_service_secret_api_key>`
 
 ### 1. Document Ingestion
-* **Endpoint**: `POST /api/v1/documents/process`
-* **Description**: Downloads the document, extracts text, chunks it, embeds it, and upserts metadata + vectors to databases. Runs asynchronously and dispatches progress updates to the `API_SERVICE_URL`.
+
+- **Endpoint**: `POST /api/v1/documents/process`
+- **Description**: Downloads the document, extracts text, chunks it, embeds it, and upserts metadata + vectors to databases. Runs asynchronously and dispatches progress updates to the `API_SERVICE_URL`.
 
 **Request Headers**:
+
 ```http
 X-API-KEY: your_rag_service_secret_api_key
 Content-Type: application/json
 ```
 
 **Request Body (`ProcessDocumentRequest`)**:
+
 ```json
 {
   "document_id": "doc_abc123",
   "file_url": "https://example-bucket.s3.amazonaws.com/reports/financials.pdf",
   "user_id": "user_xyz789",
-  "space_type": "personal", 
+  "space_type": "personal",
   "space_id": "space_123"
 }
 ```
-*Note: `space_type` must be `"personal"` or `"team"`.*
+
+_Note: `space_type` must be `"personal"` or `"team"`._
 
 **Response**:
+
 ```json
 {
   "message": "Processing completed"
@@ -184,10 +188,12 @@ Content-Type: application/json
 ---
 
 ### 2. Context-Aware Query (Ask)
-* **Endpoint**: `POST /api/v1/documents/ask`
-* **Description**: Executes similarity search over documents matched with workspace filters (`user_id`, `space_type`, `space_id`), retrieves the context, prompts Groq LLM, and retrieves a structured response.
+
+- **Endpoint**: `POST /api/v1/documents/ask`
+- **Description**: Executes similarity search over documents matched with workspace filters (`user_id`, `space_type`, `space_id`), retrieves the context, prompts Groq LLM, and retrieves a structured response.
 
 **Request Body (`AskQuestionRequest`)**:
+
 ```json
 {
   "question": "What was the company's Q3 revenue growth?",
@@ -198,6 +204,7 @@ Content-Type: application/json
 ```
 
 **Response (Context Found)**:
+
 ```json
 {
   "question": "What was the company's Q3 revenue growth?",
@@ -207,6 +214,7 @@ Content-Type: application/json
 ```
 
 **Response (No Context Found)**:
+
 ```json
 {
   "question": "What was the company's Q3 revenue growth?",
@@ -218,10 +226,12 @@ Content-Type: application/json
 ---
 
 ### 3. Check Document Ingestion Status
-* **Endpoint**: `GET /api/v1/documents/{document_id}/status`
-* **Description**: Fetches document processing details and chunk count.
+
+- **Endpoint**: `GET /api/v1/documents/{document_id}/status`
+- **Description**: Fetches document processing details and chunk count.
 
 **Response**:
+
 ```json
 {
   "document_id": "doc_abc123",
@@ -235,10 +245,12 @@ Content-Type: application/json
 ---
 
 ### 4. Delete Document
-* **Endpoint**: `DELETE /api/v1/documents/{document_id}`
-* **Description**: Deletes vectors from Qdrant, chunk mappings from MongoDB, and updates document status to `deleted`.
+
+- **Endpoint**: `DELETE /api/v1/documents/{document_id}`
+- **Description**: Deletes vectors from Qdrant, chunk mappings from MongoDB, and updates document status to `deleted`.
 
 **Request Body (`DeleteDocumentRequest`)**:
+
 ```json
 {
   "user_id": "user_xyz789",
@@ -248,6 +260,7 @@ Content-Type: application/json
 ```
 
 **Response**:
+
 ```json
 {
   "message": "Document deleted successfully"
@@ -259,6 +272,7 @@ Content-Type: application/json
 ## 🛠️ Local Development & Setup
 
 ### Option 1: Using Docker Compose (Recommended)
+
 This runs the FastAPI server with hot-reload enabled.
 
 1. Ensure Docker is installed and running on your system.
@@ -291,10 +305,10 @@ This runs the FastAPI server with hot-reload enabled.
 
 ## ⚙️ Ingestion & Retrieval Specs
 
-*   **Chunking Config**: Word splitting with a default size of `200` words per chunk and a sliding overlap of `50` words.
-*   **Vector Search Threshold**: Minimum cosine similarity score of `0.35` (configurable in `retrieval_service.py`). Hits below this value are discarded.
-*   **Token Allocation System**:
-    *   Model Context Limit: `8,192` tokens
-    *   Answer Reserved Buffer: `1,200` tokens
-    *   System Prompt & Question Buffer: `1,000` tokens
-    *   Max Context Size: `5,992` tokens (estimated as ~`23,968` characters)
+- **Chunking Config**: Word splitting with a default size of `200` words per chunk and a sliding overlap of `50` words.
+- **Vector Search Threshold**: Minimum cosine similarity score of `0.35` (configurable in `retrieval_service.py`). Hits below this value are discarded.
+- **Token Allocation System**:
+  - Model Context Limit: `8,192` tokens
+  - Answer Reserved Buffer: `1,200` tokens
+  - System Prompt & Question Buffer: `1,000` tokens
+  - Max Context Size: `5,992` tokens (estimated as ~`23,968` characters)

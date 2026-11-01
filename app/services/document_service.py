@@ -1,3 +1,4 @@
+from fastapi.concurrency import run_in_threadpool
 from datetime import datetime, timezone
 from app.services.ingestion_service import ingest_document
 from app.services.embedding_service import generate_embeddings
@@ -28,13 +29,13 @@ async def process_document_service(db, document_id: str, metadata: dict):
             upsert=True
         )
 
-        chunks = ingest_document(document_id, metadata)
+        chunks = await run_in_threadpool(ingest_document, document_id, metadata)
 
         if not chunks:
             raise Exception("No chunks extracted")
 
         texts = [chunk["text"] for chunk in chunks]
-        embeddings = generate_embeddings(texts)
+        embeddings = await run_in_threadpool(generate_embeddings, texts)
 
         for chunk, embedding in zip(chunks, embeddings):
             chunk["embedding"] = embedding
@@ -42,7 +43,7 @@ async def process_document_service(db, document_id: str, metadata: dict):
             chunk["space_type"] = metadata["space_type"]
             chunk["space_id"] = metadata["space_id"]
 
-        upsert_chunks(COLLECTION_NAME, chunks)
+        await run_in_threadpool(upsert_chunks, COLLECTION_NAME, chunks)
 
         chunk_docs = [
             {

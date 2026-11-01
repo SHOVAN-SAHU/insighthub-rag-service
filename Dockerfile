@@ -18,6 +18,9 @@ COPY requirements.txt .
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Pre-download the FastEmbed model (sentence-transformers/all-MiniLM-L6-v2) so it's baked into the image
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='sentence-transformers/all-MiniLM-L6-v2')"
+
 # Expose the port
 EXPOSE $PORT
 
